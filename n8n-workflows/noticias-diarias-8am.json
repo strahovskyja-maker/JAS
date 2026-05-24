@@ -1,0 +1,358 @@
+{
+  "name": "Noticias Diarias 8AM — Economía, IA, Data Centers",
+  "id": "LqqcmXqCCtoGXn7K",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Trigger 8AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        144,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+        "options": {}
+      },
+      "id": "node-rss-lt",
+      "name": "RSS BBC Economia",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "options": {}
+      },
+      "id": "node-rss-df",
+      "name": "RSS WSJ Markets",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+        "options": {}
+      },
+      "id": "node-rss-tc",
+      "name": "RSS TechCrunch AI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.datacenterdynamics.com/en/rss/",
+        "options": {}
+      },
+      "id": "node-rss-dc",
+      "name": "RSS Data Center Dynamics",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.wired.com/feed/rss",
+        "options": {}
+      },
+      "id": "node-rss-reuters",
+      "name": "RSS Wired Tech",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.foxnews.com/foxnews/latest",
+        "options": {}
+      },
+      "id": "node-rss-fox",
+      "name": "RSS Fox News",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        480,
+        816
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "node-merge",
+      "name": "Merge RSS",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        720,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst now = new Date();\nconst since = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\nconst noticias = items\n  .filter(item => {\n    const fecha = item.json.pubDate || item.json.isoDate;\n    if (!fecha) return true;\n    return new Date(fecha) >= since;\n  })\n  .map(item => ({\n    titulo: item.json.title || '',\n    descripcion: (item.json.contentSnippet || item.json.summary || '').slice(0, 300),\n    link: item.json.link || '',\n    fecha: item.json.pubDate || item.json.isoDate || ''\n  }))\n  .slice(0, 30);\n\nconst fecha = now.toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Santiago' });\n\nconst textoNoticias = noticias.map((n, i) =>\n  `${i+1}. ${n.titulo}\\nFecha: ${n.fecha}\\nResumen: ${n.descripcion}\\nURL: ${n.link}`\n).join('\\n\\n');\n\nreturn [{ json: { noticias, textoNoticias, total: noticias.length, fecha } }];"
+      },
+      "id": "node-filter",
+      "name": "Filtrar Ultimas 24h",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyCniUUlcXIlQUXToJ0iGeWuqxyydLo2iK0"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": {{ JSON.stringify(\"Eres JAS, asistente de noticias de Juan Andrés, ejecutivo chileno. Sus intereses: ECONOMÍA (Chile y mundo), INTELIGENCIA ARTIFICIAL y DATA CENTERS.\\n\\nAnaliza estas \" + $json.total + \" noticias de las últimas 24 horas. Selecciona las 8 a 12 más relevantes e importantes para él. Luego genera directamente un email HTML elegante y listo para enviar.\\n\\nNOTICIAS:\\n\" + $json.textoNoticias + \"\\n\\nEl email HTML debe tener:\\n- Encabezado: 'Noticias del día — \" + $json.fecha + \"'\\n- Noticias agrupadas por categoría con emoji (💹 Economía Chile, 🌎 Economía Mundo, 🤖 Inteligencia Artificial, 🏢 Data Centers)\\n- Cada noticia: título en negrita con hipervínculo, 2-3 oraciones de resumen\\n- Footer: 'Curado por Gemini · Enviado por JAS'\\n- Fondo blanco, tipografía limpia\\n\\nIMPORTANTE: Responde SOLO con el HTML puro. Sin markdown, sin backticks, sin explicaciones.\") }}\n    }]\n  }],\n  \"generationConfig\": {\"temperature\": 0.7, \"maxOutputTokens\": 8192}\n}",
+        "options": {}
+      },
+      "id": "node-gemini",
+      "name": "Gemini — Curar y Redactar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1168,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const parts = $input.first().json.candidates[0].content.parts;\nconst textPart = parts.filter(p => !p.thought).pop() || parts[parts.length - 1];\nlet html = (textPart.text || '').trim();\nhtml = html.replace(/^```html\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\nreturn [{ json: { html } }];"
+      },
+      "id": "node-clean",
+      "name": "Limpiar HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "strahovskyja73@gmail.com",
+        "toEmail": "strahovskyja73@gmail.com, jstrahovsky@medcore.cl",
+        "subject": "={{ \"📰 Noticias del día — \" + $(\"Filtrar Ultimas 24h\").first().json.fecha }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "node-gmail",
+      "name": "Enviar Gmail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1568,
+        384
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "bRUKlwhqiLUb351s",
+          "name": "Gmail SMTP JAS"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger 8AM": {
+      "main": [
+        [
+          {
+            "node": "RSS BBC Economia",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS WSJ Markets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS TechCrunch AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Data Center Dynamics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Wired Tech",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Fox News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS BBC Economia": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS WSJ Markets": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS TechCrunch AI": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS Data Center Dynamics": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "RSS Wired Tech": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "RSS Fox News": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Merge RSS": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Ultimas 24h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Ultimas 24h": {
+      "main": [
+        [
+          {
+            "node": "Gemini — Curar y Redactar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini — Curar y Redactar": {
+      "main": [
+        [
+          {
+            "node": "Limpiar HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpiar HTML": {
+      "main": [
+        [
+          {
+            "node": "Enviar Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Santiago"
+  }
+}
